@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// Normalize API base URL - remove trailing slash if present
+const rawApiBase = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = rawApiBase.replace(/\/+$/, ''); // Remove trailing slashes
 
 // Log API base URL (always, for debugging)
 console.log('API_BASE configured as:', API_BASE);
@@ -27,15 +29,17 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options.headers,
+    ...(options.headers as Record<string, string> || {}),
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE}${endpoint}`;
+  // Ensure endpoint starts with / and combine with API_BASE
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${normalizedEndpoint}`;
   
   try {
     const response = await fetch(url, {
