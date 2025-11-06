@@ -1,5 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+// Log API base URL (always, for debugging)
+console.log('API_BASE configured as:', API_BASE);
+console.log('VITE_API_URL env var:', import.meta.env.VITE_API_URL || 'NOT SET');
+
+// Warn if using localhost in production
+if (!import.meta.env.DEV && API_BASE.includes('localhost')) {
+  console.error('⚠️ WARNING: Using localhost API URL in production!');
+  console.error('Please set VITE_API_URL environment variable in Vercel.');
+}
+
 function getToken(): string | null {
   return localStorage.getItem("smartfinance_token");
 }
@@ -25,17 +35,30 @@ async function apiRequest<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const url = `${API_BASE}${endpoint}`;
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    // Handle network errors (CORS, connection refused, etc.)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error('Network error:', error.message);
+      console.error('Attempted URL:', url);
+      console.error('API_BASE:', API_BASE);
+      throw new Error(`Failed to connect to server. Please check if the backend is running at ${API_BASE}`);
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 // Auth API
