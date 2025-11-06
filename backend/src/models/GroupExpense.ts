@@ -21,3 +21,6 @@ const groupExpenseSchema = new mongoose.Schema(
 export const GroupExpense = mongoose.model("GroupExpense", groupExpenseSchema);
 
 
+
+
+

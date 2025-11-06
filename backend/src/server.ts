@@ -9,7 +9,10 @@ import groupRoutes from "./routes/groups.js";
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ 
+  origin: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || true, 
+  credentials: true 
+}));
 app.use(express.json({ limit: "2mb" }));
 
 // MongoDB connection
