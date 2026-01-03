@@ -1,6 +1,6 @@
 SmartFinance
 
-SmartFinance is a simple and intuitive personal finance management app that helps users track expenses, manage budgets, and split shared costs with groups.
+SmartFinance is a simple and intuitive personal finance management app that helps users track expenses, manage budgets, and split shared costs with the groups.
 
 Features
 
