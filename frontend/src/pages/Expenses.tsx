@@ -9,8 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getExpenses, getUser, Expense } from "@/lib/storage";
+import { getExpenses, getUser, Expense, deleteExpense } from "@/lib/storage";
 import { formatDate } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const categories = ["All", "Food", "Travel", "Shopping", "Bills", "Groceries", "Others"] as const;
 
@@ -36,6 +50,18 @@ const Expenses = () => {
     };
     loadExpenses();
   }, [navigate]);
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await deleteExpense(id);
+      toast.success("Expense deleted successfully!");
+      // Reload expenses after deletion
+      const data = await getExpenses();
+      setExpenses(data);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete expense");
+    }
+  };
 
   const filteredExpenses = filter === "All" 
     ? expenses 
@@ -74,6 +100,7 @@ const Expenses = () => {
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Description</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date</th>
                   <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Amount</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -92,11 +119,42 @@ const Expenses = () => {
                       <td className="px-6 py-4 text-right font-semibold text-primary">
                         ₹{expense.amount.toFixed(2)}
                       </td>
+                      <td className="px-6 py-4 text-center">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the expense
+                                of ₹{expense.amount.toFixed(2)} from {expense.description || "this item"}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteExpense(expense.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-6 py-20 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-6 py-20 text-center text-muted-foreground">
                       {filter === "All" ? "No expenses yet" : `No expenses in ${filter} category`}
                     </td>
                   </tr>

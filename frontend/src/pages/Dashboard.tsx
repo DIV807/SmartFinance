@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import ExpenseCard from "@/components/ExpenseCard";
 import FloatingActionButton from "@/components/FloatingActionButton";
-import { getExpenses, getUser, Expense } from "@/lib/storage";
+import { getExpenses, getUser, Expense, deleteExpense } from "@/lib/storage";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { toast } from "sonner";
 
 const CATEGORY_COLORS = {
   Food: "hsl(var(--category-food))",
@@ -41,6 +42,18 @@ const Dashboard = () => {
     };
     loadExpenses();
   }, [navigate]);
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await deleteExpense(id);
+      toast.success("Expense deleted successfully!");
+      // Reload expenses after deletion
+      const data = await getExpenses();
+      setExpenses(data);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete expense");
+    }
+  };
 
   const thisMonthTotal = expenses
     .filter((e) => {
@@ -263,7 +276,7 @@ const Dashboard = () => {
             <div className="space-y-3">
               {recentExpenses.length > 0 ? (
                 recentExpenses.map((expense) => (
-                  <ExpenseCard key={expense.id} expense={expense} />
+                  <ExpenseCard key={expense.id} expense={expense} onDelete={handleDeleteExpense} />
                 ))
               ) : (
                 <p className="text-center text-muted-foreground py-20">
