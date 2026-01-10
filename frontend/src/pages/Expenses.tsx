@@ -90,7 +90,7 @@ const Expenses = () => {
                         {formatDate(expense.date)}
                       </td>
                       <td className="px-6 py-4 text-right font-semibold text-primary">
-                        ${expense.amount.toFixed(2)}
+                        ₹{expense.amount.toFixed(2)}
                       </td>
                     </tr>
                   ))

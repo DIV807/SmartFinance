@@ -71,7 +71,7 @@ const AddExpense = () => {
           
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <Label htmlFor="amount" className="text-foreground">Amount ($)</Label>
+              <Label htmlFor="amount" className="text-foreground">Amount (₹)</Label>
               <Input
                 id="amount"
                 type="number"

@@ -21,7 +21,7 @@ const ExpenseCard = ({ expense }: ExpenseCardProps) => {
         )}
       </div>
       <div className="text-xl font-bold text-primary ml-4">
-        ${expense.amount.toFixed(2)}
+        ₹{expense.amount.toFixed(2)}
       </div>
     </div>
   );

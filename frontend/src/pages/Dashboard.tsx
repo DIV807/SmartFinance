@@ -226,7 +226,7 @@ const Dashboard = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={(entry) => `${entry.name}: $${entry.value.toFixed(0)}`}
+                    label={(entry) => `${entry.name}: ₹${entry.value.toFixed(0)}`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -238,7 +238,7 @@ const Dashboard = () => {
                       <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name as keyof typeof CATEGORY_COLORS]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
