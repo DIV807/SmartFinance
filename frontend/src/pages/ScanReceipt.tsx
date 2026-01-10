@@ -160,3 +160,9 @@ export default ScanReceipt;
 
 
 
+
+
+
+
+
+

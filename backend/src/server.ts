@@ -8,11 +8,27 @@ import expenseRoutes from "./routes/expenses.js";
 import groupRoutes from "./routes/groups.js";
 
 const app = express();
-app.use(helmet());
-app.use(cors({ 
-  origin: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || true, 
-  credentials: true 
+
+// Configure Helmet to allow cross-origin requests
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
 }));
+
+// CORS configuration - allow all origins in development, specific origin in production
+const allowedOrigins = process.env.FRONTEND_URL 
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : process.env.CORS_ORIGIN 
+    ? [process.env.CORS_ORIGIN]
+    : true;
+
+app.use(cors({ 
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json({ limit: "2mb" }));
 
 // MongoDB connection
