@@ -3,9 +3,20 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import ExpenseCard from "@/components/ExpenseCard";
 import FloatingActionButton from "@/components/FloatingActionButton";
-import { getExpenses, getUser, Expense, deleteExpense } from "@/lib/storage";
+import { getExpenses, getUser, Expense, deleteExpense, getBudget, saveBudget } from "@/lib/storage";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
+import { Pencil, Plus, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const CATEGORY_COLORS = {
   Food: "hsl(var(--category-food))",
@@ -20,7 +31,9 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [view, setView] = useState<"Daily" | "Weekly" | "Monthly">("Monthly");
-  const monthlyBudget = 10000; // Default budget; can be made configurable later
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(10000);
+  const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
+  const [budgetInput, setBudgetInput] = useState<string>("");
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
@@ -32,6 +45,10 @@ const Dashboard = () => {
       return;
     }
 
+    // Load budget from storage
+    const budget = getBudget();
+    setMonthlyBudget(budget);
+
     const loadExpenses = async () => {
       try {
         const data = await getExpenses();
@@ -42,6 +59,37 @@ const Dashboard = () => {
     };
     loadExpenses();
   }, [navigate]);
+
+  const handleOpenBudgetDialog = () => {
+    setBudgetInput(monthlyBudget.toString());
+    setIsBudgetDialogOpen(true);
+  };
+
+  const handleSaveBudget = () => {
+    const newBudget = Number.parseFloat(budgetInput);
+    if (isNaN(newBudget) || newBudget <= 0) {
+      toast.error("Please enter a valid budget amount");
+      return;
+    }
+    try {
+      saveBudget(newBudget);
+      setMonthlyBudget(newBudget);
+      setIsBudgetDialogOpen(false);
+      toast.success("Budget updated successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save budget");
+    }
+  };
+
+  const handleAdjustBudget = (amount: number) => {
+    const currentBudget = Number.parseFloat(budgetInput) || monthlyBudget;
+    const newBudget = currentBudget + amount;
+    if (newBudget < 0) {
+      toast.error("Budget cannot be negative");
+      return;
+    }
+    setBudgetInput(newBudget.toString());
+  };
 
   const handleDeleteExpense = async (id: string) => {
     try {
@@ -168,8 +216,19 @@ const Dashboard = () => {
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <div className="md:col-span-2 rounded-2xl p-6 shadow-md border border-border bg-card transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '0ms' }}>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Spent this month</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Spent this month</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleOpenBudgetDialog}
+                    title="Edit budget"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
                 <h2 className="text-3xl font-bold mt-1">{formatCurrency(thisMonthTotal)} <span className="text-muted-foreground text-base">/ {formatCurrency(monthlyBudget)}</span></h2>
               </div>
               <div className="hidden md:block text-right">
@@ -289,6 +348,93 @@ const Dashboard = () => {
       </div>
 
       <FloatingActionButton />
+
+      {/* Budget Edit Dialog */}
+      <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Monthly Budget</DialogTitle>
+            <DialogDescription>
+              Set your monthly budget. You can adjust it by increasing or decreasing the amount.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => handleAdjustBudget(-1000)}
+                className="h-10 w-10"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="flex-1">
+                <Input
+                  type="number"
+                  value={budgetInput}
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                  placeholder="Enter budget amount"
+                  className="text-lg"
+                  min="0"
+                  step="100"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => handleAdjustBudget(1000)}
+                className="h-10 w-10"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAdjustBudget(-500)}
+              >
+                -500
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAdjustBudget(-100)}
+              >
+                -100
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAdjustBudget(100)}
+              >
+                +100
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAdjustBudget(500)}
+              >
+                +500
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsBudgetDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSaveBudget}>
+              Save Budget
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

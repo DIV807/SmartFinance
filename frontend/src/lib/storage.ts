@@ -70,6 +70,7 @@ export interface SharedExpense {
 
 const GROUPS_KEY = "smartfinance_groups";
 const GROUP_EXPENSES_KEY = "smartfinance_group_expenses";
+const BUDGET_KEY = "smartfinance_budget";
 
 export const getGroups = (): Group[] => {
   const stored = localStorage.getItem(GROUPS_KEY);
@@ -134,4 +135,17 @@ export const computeGroupBalances = (groupId: string) => {
     }
   }
   return balances;
+};
+
+// Budget management
+export const getBudget = (): number => {
+  const stored = localStorage.getItem(BUDGET_KEY);
+  return stored ? Number.parseFloat(stored) : 10000; // Default to 10000 if not set
+};
+
+export const saveBudget = (budget: number) => {
+  if (budget < 0) {
+    throw new Error("Budget cannot be negative");
+  }
+  localStorage.setItem(BUDGET_KEY, budget.toString());
 };
