@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
-import { getUser, getGroups, addGroup, computeGroupBalances } from "@/lib/storage";
+import { getUser, getGroups, addGroup, computeGroupBalances, deleteGroup } from "@/lib/storage";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const Groups = () => {
   const navigate = useNavigate();
@@ -30,6 +44,16 @@ const Groups = () => {
     navigate(`/groups/${g.id}`);
   };
 
+  const handleDeleteGroup = (groupId: string, groupName: string) => {
+    try {
+      deleteGroup(groupId);
+      setGroups(getGroups());
+      toast.success(`Group "${groupName}" deleted successfully!`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete group");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -47,15 +71,52 @@ const Groups = () => {
               const balances = computeGroupBalances(g.id);
               const summary = summarizeBalances(balances);
               return (
-                <button key={g.id} onClick={() => navigate(`/groups/${g.id}`)} className="text-left rounded-xl border border-border bg-card p-5 hover:shadow-md transition">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold">{g.name}</div>
-                      <div className="text-sm text-muted-foreground">{g.members.join(", ")}</div>
+                <div key={g.id} className="relative rounded-xl border border-border bg-card p-5 hover:shadow-md transition">
+                  <button
+                    onClick={() => navigate(`/groups/${g.id}`)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between pr-8">
+                      <div>
+                        <div className="font-semibold">{g.name}</div>
+                        <div className="text-sm text-muted-foreground">{g.members.join(", ")}</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{summary}</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">{summary}</div>
+                  </button>
+                  <div className="absolute top-4 right-4">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the group
+                            "{g.name}" and all associated expenses.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteGroup(g.id, g.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

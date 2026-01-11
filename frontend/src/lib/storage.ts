@@ -94,6 +94,17 @@ export const addGroup = (name: string, members: string[]): Group => {
   return group;
 };
 
+export const deleteGroup = (groupId: string) => {
+  const groups = getGroups();
+  const filteredGroups = groups.filter((g) => g.id !== groupId);
+  saveGroups(filteredGroups);
+  
+  // Also delete all expenses associated with this group
+  const expenses = getGroupExpenses();
+  const filteredExpenses = expenses.filter((e) => e.groupId !== groupId);
+  saveGroupExpenses(filteredExpenses);
+};
+
 export const getGroupExpenses = (): SharedExpense[] => {
   const stored = localStorage.getItem(GROUP_EXPENSES_KEY);
   return stored ? JSON.parse(stored) : [];
