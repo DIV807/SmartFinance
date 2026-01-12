@@ -69,6 +69,19 @@ const GroupDetail = () => {
                         <div className="font-medium">{e.description}</div>
                         <div className="text-xs text-muted-foreground">Paid by {e.paidBy} on {new Date(e.date).toLocaleDateString()}</div>
                         <div className="text-xs text-muted-foreground">Split among: {e.participants.join(", ")}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Split type: {e.splitType ? e.splitType : "equal"}
+                        </div>
+                        {e.shares && Object.keys(e.shares).length > 0 && (
+                          <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                            {Object.entries(e.shares).map(([person, share]) => (
+                              <div key={person} className="flex items-center justify-between">
+                                <span>{person}</span>
+                                <span>owes {fmt(share)} {person === e.paidBy ? "(payer)" : ""}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="text-lg font-semibold">₹ {e.amount}</div>
                     </div>

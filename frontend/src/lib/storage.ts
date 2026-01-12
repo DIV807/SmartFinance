@@ -64,6 +64,10 @@ export interface SharedExpense {
   description: string;
   paidBy: string; // member name/email
   participants: string[]; // members included in split
+  // Amount owed per participant (currency, not percent). Optional for legacy data.
+  shares?: Record<string, number>;
+  // How the split was decided (display only).
+  splitType?: "equal" | "percent" | "exact";
   date: string;
   createdAt: string;
 }
@@ -137,12 +141,21 @@ export const computeGroupBalances = (groupId: string) => {
 
   for (const e of expenses) {
     const participants = e.participants.length ? e.participants : group.members;
-    const share = e.amount / participants.length;
     // Payer initially covers all
     balances[e.paidBy] += e.amount;
-    // Each participant owes their share
-    for (const p of participants) {
-      balances[p] -= share;
+
+    // Determine per-participant shares. If explicit shares exist, use them; otherwise split equally.
+    const hasExplicitShares = e.shares && Object.keys(e.shares).length > 0;
+    if (hasExplicitShares && e.shares) {
+      for (const p of participants) {
+        const share = e.shares[p] ?? 0;
+        balances[p] -= share;
+      }
+    } else {
+      const share = e.amount / participants.length;
+      for (const p of participants) {
+        balances[p] -= share;
+      }
     }
   }
   return balances;
