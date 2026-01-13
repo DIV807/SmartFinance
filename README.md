@@ -4,7 +4,7 @@ SmartFinance is a simple and intuitive personal finance management app that help
 
 Features
 
-User authentication (JWT)
+User authentication 
 Add, edit, delete personal expenses
 Budget tracking & category-wise analytics
 Group expense splitting
