@@ -130,36 +130,70 @@ export const addSharedExpense = (expense: Omit<SharedExpense, "id" | "createdAt"
   return newItem;
 };
 
-// Compute balances for a group: positive => owed to you, negative => you owe
-export const computeGroupBalances = (groupId: string) => {
-  const groups = getGroups();
-  const group = groups.find((g) => g.id === groupId);
-  if (!group) return {} as Record<string, number>;
-  const expenses = getGroupExpenses().filter((e) => e.groupId === groupId);
+// Compute balances for a group(New)
+export function computeGroupBalances(groupId: string) {
+  const group = getGroups().find(g => g.id === groupId);
+  if (!group) return {};
+
+  const expenses = getGroupExpenses().filter(e => e.groupId === groupId);
+
   const balances: Record<string, number> = {};
-  group.members.forEach((m) => (balances[m] = 0));
+  group.members.forEach(m => balances[m] = 0);
 
-  for (const e of expenses) {
-    const participants = e.participants.length ? e.participants : group.members;
-    // Payer initially covers all
-    balances[e.paidBy] += e.amount;
+  expenses.forEach(exp => {
+    // payer paid full amount
+    balances[exp.paidBy] += exp.amount;
 
-    // Determine per-participant shares. If explicit shares exist, use them; otherwise split equally.
-    const hasExplicitShares = e.shares && Object.keys(e.shares).length > 0;
-    if (hasExplicitShares && e.shares) {
-      for (const p of participants) {
-        const share = e.shares[p] ?? 0;
-        balances[p] -= share;
-      }
-    } else {
-      const share = e.amount / participants.length;
-      for (const p of participants) {
-        balances[p] -= share;
-      }
+    // everyone owes their share (including payer)
+    if (exp.shares) {
+      Object.entries(exp.shares).forEach(([person, share]) => {
+        balances[person] -= share;
+      });
     }
-  }
+  });
+
   return balances;
-};
+}
+
+
+export function computeSettlements(groupId: string) {
+  const balances = computeGroupBalances(groupId);
+
+  const creditors: [string, number][] = [];
+  const debtors: [string, number][] = [];
+
+  Object.entries(balances).forEach(([person, balance]) => {
+    if (balance > 1) creditors.push([person, balance]);
+    else if (balance < -1) debtors.push([person, -balance]);
+  });
+
+  const settlements: { from: string; to: string; amount: number }[] = [];
+
+  let i = 0, j = 0;
+
+  while (i < debtors.length && j < creditors.length) {
+    const [debtor, debt] = debtors[i];
+    const [creditor, credit] = creditors[j];
+
+    const paid = Math.min(debt, credit);
+
+    settlements.push({
+      from: debtor,
+      to: creditor,
+      amount: Math.round(paid),
+    });
+
+    debtors[i][1] -= paid;
+    creditors[j][1] -= paid;
+
+    if (debtors[i][1] <= 1) i++;
+    if (creditors[j][1] <= 1) j++;
+  }
+
+  return settlements;
+}
+
+
 
 // Budget management
 export const getBudget = (): number => {

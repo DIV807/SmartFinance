@@ -2,11 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { getUser, getGroups, getGroupExpenses, computeGroupBalances } from "@/lib/storage";
+import { computeSettlements } from ".././lib/storage";
+
+
 
 const GroupDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
+
+  const settlements = useMemo(
+    () => (id ? computeSettlements(id) : []),
+    [id]
+  );
 
   useEffect(() => {
     const user = getUser();
@@ -56,6 +64,27 @@ const GroupDetail = () => {
             </div>
           </div>
 
+          <div className="rounded-2xl p-6 shadow-md border border-border bg-card mt-6">
+            <h3 className="text-lg font-semibold mb-3">Who Pays Whom</h3>
+
+  {settlements.length === 0 ? (
+    <p className="text-muted-foreground text-sm">All settled !!</p>
+  ) : (
+    <div className="space-y-2">
+      {settlements.map((s, i) => (
+        <div key={i} className="text-sm">
+          <span className="font-medium">{s.from}</span>
+          {" pays "}
+          <span className="font-medium">{fmt(s.amount)}</span>
+          {" to "}
+          <span className="font-medium">{s.to}</span>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+
           <div className="rounded-2xl p-6 shadow-md border border-border bg-card">
             <h3 className="text-lg font-semibold mb-3">Shared Expenses</h3>
             {expenses.length === 0 ? (
@@ -77,7 +106,12 @@ const GroupDetail = () => {
                             {Object.entries(e.shares).map(([person, share]) => (
                               <div key={person} className="flex items-center justify-between">
                                 <span>{person}</span>
-                                <span>owes {fmt(share)} {person === e.paidBy ? "(payer)" : ""}</span>
+                                <span>
+  {person === e.paidBy
+    ? `share ${fmt(share)} (already paid)`
+    : `owes ${fmt(share)}`}
+</span>
+
                               </div>
                             ))}
                           </div>
