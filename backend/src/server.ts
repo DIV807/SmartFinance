@@ -6,7 +6,6 @@ import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import expenseRoutes from "./routes/expenses.js";
 import groupRoutes from "./routes/groups.js";
-import receiptRoutes from "./routes/receipt";
 
 const app = express();
 
@@ -49,7 +48,6 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/auth", authRoutes);
 app.use("/expenses", expenseRoutes);
 app.use("/groups", groupRoutes);
-app.use("/api/receipt", receiptRoutes);
 
 
 const port = Number(process.env.PORT || 5000);
