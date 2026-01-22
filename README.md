@@ -1,64 +1,162 @@
-SmartFinance
+# SmartFinance
 
-SmartFinance is a simple and intuitive personal finance management app that helps users track expenses, manage budget, and split shared costs with the groups.
+SmartFinance is a **simple and intuitive personal finance management app** that helps users **track expenses**, **manage budgets**, and **split shared costs within groups**, all through a clean and responsive dashboard.
 
-Features
+---
 
-User authentication 
-Add, edit, delete personal expenses
-Budget tracking & category-wise analytics
-Group expense splitting
-Clean and responsive UI
-Dashboard with spending insights
+## Features
 
-Tech Stack
+* **User Authentication**
 
-Frontend: React, TypeScript, TailwindCSS, React Query
-Backend: Node.js, Express, TypeScript, MongoDB
-Security: JWT, bcrypt
-Validation: Zod
+  * Secure login and registration using JWT
+* **Expense Management**
 
-Getting Started
+  * Add, edit, and delete personal expenses
+* **Budget Tracking and Analytics**
 
-Install
-git clone <repo-url>
+  * Category-wise spending insights
+* **Group Expense Splitting**
+
+  * Create groups and track shared expenses
+* **Dashboard**
+
+  * Visual overview of spending patterns
+* **Clean and Responsive UI**
+
+  * Optimized for desktop and mobile devices
+
+---
+
+## Tech Stack
+
+### Frontend
+
+* React
+* TypeScript
+* Tailwind CSS
+* React Query
+
+### Backend
+
+* Node.js
+* Express
+* TypeScript
+* MongoDB
+
+### Security and Validation
+
+* JWT (JSON Web Tokens)
+* bcrypt (password hashing)
+* Zod (schema validation)
+
+---
+
+## Getting Started
+
+### Clone the Repository
+
+```bash
+git clone <repository-url>
 cd smartfinance
+```
 
-Install dependencies:
+### Install Dependencies
 
-cd backend && npm install
-cd ../frontend && npm install
+```bash
+# Backend
+cd backend
+npm install
 
-Environment Variables
+# Frontend
+cd ../frontend
+npm install
+```
 
-Backend .env example:
+---
+
+## Environment Variables
+
+### Backend (`.env`)
+
+```env
 PORT=4000
-MONGO_URI=<your-mongo-uri>
-JWT_SECRET=<secret>
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+```
 
-Frontend .env example:
+### Frontend (`.env`)
+
+```env
 VITE_API_URL=http://localhost:4000/api
+```
 
-Run
+---
 
-Backend:
+## Running the Application
+
+### Start Backend Server
+
+```bash
+cd backend
 npm run dev
+```
 
-Frontend:
+### Start Frontend Server
+
+```bash
+cd frontend
 npm run dev
+```
 
+The application will be available at:
 
-API Overview
+* Frontend: `http://localhost:5173`
+* Backend: `http://localhost:4000`
 
-POST /auth/register, /auth/login
-GET/POST /expenses
-GET /dashboard/summary
-POST /groups → create group
-POST /groups/:id/expenses → add group expense
+---
 
+## API Overview
 
-Future Enhancements
+### Authentication
 
-Receipt OCR
-AI budgeting recommendations
-Mobile app version
+* `POST /auth/register` – Register a new user
+* `POST /auth/login` – Login user
+
+### Expenses
+
+* `GET /expenses` – Fetch expenses
+* `POST /expenses` – Add expense
+
+### Dashboard
+
+* `GET /dashboard/summary` – Get spending summary
+
+### Groups
+
+* `POST /groups` – Create a group
+* `POST /groups/:id/expenses` – Add a group expense
+
+---
+
+## Future Enhancements
+
+* Receipt OCR for automatic expense entry
+* AI-powered budgeting recommendations
+* Mobile application (Android and iOS)
+
+---
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome.
+Feel free to fork the repository and submit a pull request.
+
+---
+
+## Support
+
+If you find this project useful, consider starring the repository on GitHub.
+
+---
+
+**Built to simplify personal finance management.**
