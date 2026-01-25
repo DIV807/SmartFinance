@@ -8,19 +8,27 @@ const upload = multer({ dest: "uploads/" });
 
 app.post("/scan", upload.single("receipt"), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file received" });
+    }
+
     const imagePath = req.file.path;
+    console.log("OCR image path:", imagePath);
 
     const result = await Tesseract.recognize(imagePath, "eng");
+
     fs.unlinkSync(imagePath);
 
     res.json({
       success: true,
-      text: result.data.text
+      text: result.data.text,
     });
   } catch (err) {
-    res.status(500).json({ error: "OCR failed" });
+    console.error("OCR ERROR:", err);
+    res.status(500).json({ error: "OCR failed" }); // 👈 important
   }
 });
+
 
 app.get("/health", (_, res) => res.send("OK"));
 
