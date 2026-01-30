@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
-import { aiParseReceipt } from "../utils/aiParseReceipt.js";
+import { aiParseReceipt } from "../utils/aiParseReceipt";
 
 const router = Router();
 const upload = multer({ dest: "tmp/" });
