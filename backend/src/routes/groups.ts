@@ -9,17 +9,123 @@ import mongoose from "mongoose";
 const router = Router();
 router.use(requireAuth);
 
-// Create group with members (userIds)
-const createGroupSchema = z.object({ name: z.string().min(1), members: z.array(z.string().min(1)).min(2) });
+// Create group with members (emails or free-form names)
+const createGroupSchema = z.object({
+  name: z.string().min(1),
+  participants: z
+    .array(
+      z.object({
+        email: z.string().email().optional(),
+        name: z.string().min(1).optional(),
+      })
+    )
+    .min(1),
+});
+
 router.post("/", async (req: AuthRequest, res) => {
   const parsed = createGroupSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { name, members } = parsed.data;
-  // Convert member IDs to ObjectIds
-  const memberIds = members.map((id) => new mongoose.Types.ObjectId(id));
-  const group = await Group.create({ name, members: memberIds });
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const { name, participants } = parsed.data;
+
+  // Resolve participants to actual users when email exists; otherwise keep them as free-form names
+  const memberIds: mongoose.Types.ObjectId[] = [];
+  const memberDisplayNames: string[] = [];
+
+  for (const p of participants) {
+    if (p.email) {
+      const user = await User.findOne({ email: p.email });
+      if (user) {
+        memberIds.push(user._id as mongoose.Types.ObjectId);
+        memberDisplayNames.push(user.name);
+        continue;
+      }
+    }
+    // Fall back to name-only if no account found by email
+    if (p.name) {
+      memberDisplayNames.push(p.name);
+    }
+  }
+
+  if (memberIds.length === 0 && memberDisplayNames.length === 0) {
+    return res.status(400).json({ error: "At least one valid participant is required" });
+  }
+
+  const group = await Group.create({
+    name,
+    members: memberIds,
+  });
+
   await group.populate("members");
-  res.json({ group });
+
+  res.json({
+    group,
+    meta: {
+      memberDisplayNames,
+    },
+  });
+});
+
+// Add members to an existing group
+const addMembersSchema = z.object({
+  participants: z
+    .array(
+      z.object({
+        email: z.string().email().optional(),
+        name: z.string().min(1).optional(),
+      })
+    )
+    .min(1),
+});
+
+router.post("/:id/members", async (req: AuthRequest, res) => {
+  const groupId = req.params.id;
+  const parsed = addMembersSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const group = await Group.findById(groupId);
+  if (!group) {
+    return res.status(404).json({ error: "Group not found" });
+  }
+
+  const { participants } = parsed.data;
+
+  const currentMemberIds = new Set(group.members.map((m) => m.toString()));
+  const newMemberIds: mongoose.Types.ObjectId[] = [];
+  const addedDisplayNames: string[] = [];
+
+  for (const p of participants) {
+    if (p.email) {
+      const user = await User.findOne({ email: p.email });
+      if (user && !currentMemberIds.has(user._id.toString())) {
+        newMemberIds.push(user._id as mongoose.Types.ObjectId);
+        addedDisplayNames.push(user.name);
+        continue;
+      }
+    }
+    if (p.name) {
+      // purely name-based "guest" participant, tracked only on frontend for now
+      addedDisplayNames.push(p.name);
+    }
+  }
+
+  if (newMemberIds.length > 0) {
+    group.members.push(...newMemberIds);
+    await group.save();
+  }
+
+  await group.populate("members");
+
+  res.json({
+    group,
+    meta: {
+      addedDisplayNames,
+    },
+  });
 });
 
 // Add shared expense to group
@@ -82,6 +188,22 @@ router.get("/:id/balances", async (req: AuthRequest, res) => {
   }
   res.json({ balances: byUser });
 });
+
+
+// Delete shared expense
+// Delete group expense (SAME pattern as normal expense)
+router.delete("/expenses/:id", async (req: AuthRequest, res) => {
+  const { id } = req.params;
+
+  const exp = await GroupExpense.findById(id);
+  if (!exp || exp.payerId.toString() !== req.userId)
+    return res.status(404).json({ error: "Not found" });
+
+  await GroupExpense.findByIdAndDelete(id);
+  res.json({ ok: true });
+});
+
+
 
 export default router;
 
