@@ -3,7 +3,14 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import ExpenseCard from "@/components/ExpenseCard";
 import FloatingActionButton from "@/components/FloatingActionButton";
-import { getExpenses, getUser, Expense, deleteExpense, getBudget, saveBudget } from "@/lib/storage";
+import {
+  getExpenses,
+  getUser,
+  Expense,
+  deleteExpense,
+  getBudget,
+  saveBudget,
+} from "@/lib/storage";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
 import { Pencil, Plus, Minus } from "lucide-react";
@@ -114,7 +121,12 @@ const Dashboard = () => {
     })
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const budgetUsedPct = Math.min(100, Math.round((thisMonthTotal / monthlyBudget) * 100));
+  const budgetUsedPct =
+    monthlyBudget > 0
+      ? Math.min(100, Math.round((thisMonthTotal / monthlyBudget) * 100))
+      : 0;
+  const budgetExceeded = monthlyBudget > 0 && thisMonthTotal > monthlyBudget;
+  const overBy = budgetExceeded ? thisMonthTotal - monthlyBudget : 0;
 
   const categoryData = Object.keys(CATEGORY_COLORS).map((category) => ({
     name: category,
@@ -229,15 +241,32 @@ const Dashboard = () => {
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <h2 className="text-3xl font-bold mt-1">{formatCurrency(thisMonthTotal)} <span className="text-muted-foreground text-base">/ {formatCurrency(monthlyBudget)}</span></h2>
+                <h2 className="text-3xl font-bold mt-1">
+                  {formatCurrency(thisMonthTotal)}{" "}
+                  <span className="text-muted-foreground text-base">
+                    / {formatCurrency(monthlyBudget)}
+                  </span>
+                </h2>
+                {budgetExceeded && (
+                  <p className="mt-1 text-sm font-medium text-destructive">
+                    Over budget by {formatCurrency(overBy)}
+                  </p>
+                )}
               </div>
               <div className="hidden md:block text-right">
                 <p className="text-sm text-muted-foreground">Budget used</p>
                 <p className="text-xl font-semibold">{budgetUsedPct}%</p>
               </div>
             </div>
-            <div className="mt-4 h-3 rounded-full bg-[hsl(var(--secondary))] overflow-hidden">
-              <div className="h-full bg-[hsl(var(--primary))]" style={{ width: `${budgetUsedPct}%` }} />
+              <div className="mt-4 h-3 rounded-full bg-[hsl(var(--secondary))] overflow-hidden">
+                <div
+                  className={`h-full ${
+                    budgetExceeded
+                      ? "bg-destructive"
+                      : "bg-[hsl(var(--primary))]"
+                  }`}
+                  style={{ width: `${budgetUsedPct}%` }}
+                />
             </div>
           </div>
           <div className="rounded-2xl p-6 shadow-md border border-border bg-card transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '100ms' }}>
