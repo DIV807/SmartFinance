@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import expenseRoutes from "./routes/expenses.js";
 import groupRoutes from "./routes/groups.js";
-import receiptRoutes from "./routes/receipt";
+import receiptRoutes from "./routes/receipt.js";
 
 const app = express();
 
