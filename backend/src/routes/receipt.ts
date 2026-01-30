@@ -1,12 +1,15 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import fs from "fs";
-import { aiParseReceipt } from "../utils/aiParseReceipt";
+import { aiParseReceipt } from "../utils/aiParseReceipt.js";
 
 const router = Router();
 const upload = multer({ dest: "tmp/" });
 
-router.post("/scan", upload.single("receipt"), async (req, res) => {
+router.post(
+  "/scan",
+  upload.single("receipt"),
+  async (req: Request & { file?: any }, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded to backend" });
@@ -55,6 +58,7 @@ router.post("/scan", upload.single("receipt"), async (req, res) => {
     console.error("BACKEND OCR ERROR:", err);
     res.status(500).json({ error: "Receipt scan failed" });
   }
-});
+  }
+);
 
 export default router;
