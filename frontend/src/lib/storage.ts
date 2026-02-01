@@ -1,3 +1,6 @@
+import { expensesApi, authApi } from "./api";
+
+
 export interface Expense {
   id: string;
   amount: number;
@@ -16,7 +19,6 @@ export interface User {
 const USER_KEY = "smartfinance_user";
 
 // Use API for expenses
-import { expensesApi, authApi } from "./api";
 
 export const getExpenses = async (): Promise<Expense[]> => {
   try {
@@ -191,6 +193,14 @@ export function computeSettlements(groupId: string) {
   }
 
   return settlements;
+}
+
+//delete shared expense
+export function deleteSharedExpense(expenseId: string) {
+  const expenses = getGroupExpenses();
+  const updated = expenses.filter((e) => e.id !== expenseId);
+  // Reuse the same helper to keep storage key consistent
+  saveGroupExpenses(updated);
 }
 
 
