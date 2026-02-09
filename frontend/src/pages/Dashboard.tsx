@@ -219,6 +219,94 @@ const Dashboard = () => {
 
   const recentExpenses = expenses.slice(0, 5);
 
+  // Group expenses by month
+  const monthlyExpenses: Record<string, { total: number; count: number; expenses: Expense[] }> = {};
+  expenses.forEach((expense) => {
+    const expenseDate = new Date(expense.date);
+    const monthKey = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (!monthlyExpenses[monthKey]) {
+      monthlyExpenses[monthKey] = { total: 0, count: 0, expenses: [] };
+    }
+    monthlyExpenses[monthKey].total += expense.amount;
+    monthlyExpenses[monthKey].count += 1;
+    monthlyExpenses[monthKey].expenses.push(expense);
+  });
+
+  // Sort months descending (most recent first)
+  const sortedMonths = Object.entries(monthlyExpenses)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 6); // Show last 6 months
+
+  // Calculate monthly spending vs budget
+  const getMonthlyBudgetStatus = (monthTotal: number) => {
+    const percentage = monthlyBudget > 0 ? (monthTotal / monthlyBudget) * 100 : 0;
+    const exceeded = monthTotal > monthlyBudget;
+    const overBy = exceeded ? monthTotal - monthlyBudget : 0;
+    return { percentage, exceeded, overBy };
+  };
+
+  // AI Insights Generator
+  const generateAIInsights = () => {
+    const insights: string[] = [];
+    
+    if (sortedMonths.length === 0) {
+      return ["Start tracking your expenses to get personalized insights!"];
+    }
+
+    // Compare current month with previous month
+    if (sortedMonths.length >= 2) {
+      const [currentMonthKey, currentMonthData] = sortedMonths[0];
+      const [prevMonthKey, prevMonthData] = sortedMonths[1];
+      const change = currentMonthData.total - prevMonthData.total;
+      const changePercent = prevMonthData.total > 0 ? (change / prevMonthData.total) * 100 : 0;
+      
+      if (changePercent > 10) {
+        insights.push(`Your spending increased by ${Math.abs(changePercent).toFixed(1)}% compared to last month. Consider reviewing your expenses to identify areas where you can cut back.`);
+      } else if (changePercent < -10) {
+        insights.push(`Great job! Your spending decreased by ${Math.abs(changePercent).toFixed(1)}% compared to last month. Keep up the good work!`);
+      }
+    }
+
+    // Budget adherence
+    const currentMonthStatus = getMonthlyBudgetStatus(thisMonthTotal);
+    if (currentMonthStatus.exceeded) {
+      insights.push(`You've exceeded your monthly budget by ${formatCurrency(currentMonthStatus.overBy)}. Try to reduce spending in non-essential categories.`);
+    } else if (currentMonthStatus.percentage > 80) {
+      insights.push(`You're at ${currentMonthStatus.percentage.toFixed(0)}% of your budget. Be mindful of your remaining budget for this month.`);
+    } else if (currentMonthStatus.percentage < 50 && thisMonthTotal > 0) {
+      insights.push(`You're doing well! You've only used ${currentMonthStatus.percentage.toFixed(0)}% of your budget this month.`);
+    }
+
+    // Category analysis
+    const topCategory = topCategoryEntry;
+    if (topCategory && topCategory[1] > monthlyBudget * 0.3) {
+      insights.push(`${topCategory[0]} is your highest spending category at ${formatCurrency(topCategory[1])}. Consider setting a category-specific budget or finding alternatives.`);
+    }
+
+    // Average spending
+    if (sortedMonths.length >= 3) {
+      const avgSpending = sortedMonths.slice(0, 3).reduce((sum, [, data]) => sum + data.total, 0) / 3;
+      if (avgSpending > monthlyBudget) {
+        insights.push(`Your average spending over the last 3 months (${formatCurrency(avgSpending)}) exceeds your budget. Consider adjusting your budget or reducing expenses.`);
+      }
+    }
+
+    // Spending frequency
+    const avgExpensesPerMonth = sortedMonths.reduce((sum, [, data]) => sum + data.count, 0) / sortedMonths.length;
+    if (avgExpensesPerMonth > 30) {
+      insights.push(`You're making many small transactions (avg ${avgExpensesPerMonth.toFixed(0)} per month). Consider consolidating purchases to better track your spending.`);
+    }
+
+    if (insights.length === 0) {
+      insights.push("Your spending patterns look healthy! Keep tracking your expenses to maintain good financial habits.");
+    }
+
+    return insights;
+  };
+
+  const aiInsights = generateAIInsights();
+
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       <Navbar />
@@ -372,6 +460,111 @@ const Dashboard = () => {
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Monthly Expenses Section */}
+        <div className="bg-card rounded-2xl p-6 shadow-md border border-border mb-8 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '250ms' }}>
+          <h3 className="text-xl font-semibold mb-4 text-foreground">Monthly Expenses Overview</h3>
+          {sortedMonths.length > 0 ? (
+            <div className="space-y-4">
+              {sortedMonths.map(([monthKey, monthData]) => {
+                const expenseDate = new Date(monthKey + '-01');
+                const monthLabel = expenseDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const status = getMonthlyBudgetStatus(monthData.total);
+                const isCurrentMonth = monthKey === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                
+                return (
+                  <div
+                    key={monthKey}
+                    className={`rounded-lg border p-4 transition-colors ${
+                      status.exceeded
+                        ? 'border-destructive bg-destructive/5'
+                        : 'border-border bg-muted/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-semibold text-foreground">{monthLabel}</h4>
+                        {isCurrentMonth && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                            Current
+                          </span>
+                        )}
+                        {status.exceeded && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                            Over Budget
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-lg font-bold ${status.exceeded ? 'text-destructive' : 'text-primary'}`}>
+                          {formatCurrency(monthData.total)}
+                        </div>
+                        {status.exceeded && (
+                          <div className="text-xs text-destructive mt-0.5">
+                            Over by {formatCurrency(status.overBy)}
+                          </div>
+                        )}
+                        {!status.exceeded && monthlyBudget > 0 && (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {status.percentage.toFixed(0)}% of budget
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{monthData.count} expense{monthData.count !== 1 ? 's' : ''}</span>
+                      {monthlyBudget > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>Budget: {formatCurrency(monthlyBudget)}</span>
+                        </>
+                      )}
+                    </div>
+                    {monthlyBudget > 0 && (
+                      <div className="mt-2 h-2 rounded-full bg-[hsl(var(--secondary))] overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            status.exceeded
+                              ? 'bg-destructive'
+                              : status.percentage > 80
+                              ? 'bg-yellow-500'
+                              : 'bg-[hsl(var(--primary))]'
+                          }`}
+                          style={{ width: `${Math.min(100, status.percentage)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-8">
+              No monthly expenses to display yet
+            </p>
+          )}
+        </div>
+
+        {/* AI Insights Section */}
+        <div className="bg-card rounded-2xl p-6 shadow-md border border-border mb-8 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '300ms' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-xl font-semibold text-foreground">AI Insights & Recommendations</h3>
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+              Powered by AI
+            </span>
+          </div>
+          <div className="space-y-3">
+            {aiInsights.map((insight, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border"
+              >
+                <div className="mt-0.5 flex-shrink-0 w-2 h-2 rounded-full bg-primary" />
+                <p className="text-sm text-foreground leading-relaxed">{insight}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

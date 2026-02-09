@@ -67,6 +67,11 @@ const Expenses = () => {
     ? expenses 
     : expenses.filter((e) => e.category === filter);
 
+  const totalAmount = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -105,53 +110,65 @@ const Expenses = () => {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredExpenses.length > 0 ? (
-                  filteredExpenses.map((expense) => (
-                    <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <CategoryBadge category={expense.category} />
-                      </td>
-                      <td className="px-6 py-4 text-foreground">
-                        {expense.description || <span className="text-muted-foreground italic">No description</span>}
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">
-                        {formatDate(expense.date)}
-                      </td>
-                      <td className="px-6 py-4 text-right font-semibold text-primary">
-                        ₹{expense.amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the expense
-                                of ₹{expense.amount.toFixed(2)} from {expense.description || "this item"}.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteExpense(expense.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  <>
+                    {filteredExpenses.map((expense) => (
+                      <tr key={expense.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <CategoryBadge category={expense.category} />
+                        </td>
+                        <td className="px-6 py-4 text-foreground">
+                          {expense.description || <span className="text-muted-foreground italic">No description</span>}
+                        </td>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {formatDate(expense.date)}
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-primary">
+                          ₹{expense.amount.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the expense
+                                  of ₹{expense.amount.toFixed(2)} from {expense.description || "this item"}.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteExpense(expense.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Total Row */}
+                    <tr className="bg-muted/50 border-t-2 border-border">
+                      <td colSpan={3} className="px-6 py-4 text-right font-bold text-foreground">
+                        Total:
                       </td>
+                      <td className="px-6 py-4 text-right font-bold text-lg text-primary">
+                        {formatCurrency(totalAmount)}
+                      </td>
+                      <td className="px-6 py-4"></td>
                     </tr>
-                  ))
+                  </>
                 ) : (
                   <tr>
                     <td colSpan={5} className="px-6 py-20 text-center text-muted-foreground">
