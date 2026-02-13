@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
-import { getUser, getGroups, addGroup, computeGroupBalances, deleteGroup } from "@/lib/storage";
-import { Trash2 } from "lucide-react";
+import { getUser, getGroupsForCurrentUser, addGroup, computeGroupBalances, deleteGroup, getMemberDisplay, getMemberDisplayByKey, type GroupMember } from "@/lib/storage";
+import { Trash2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -17,12 +17,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+const emptyMember = (): GroupMember => ({ name: "", email: "" });
+
 const Groups = () => {
   const navigate = useNavigate();
-  const [groups, setGroups] = useState(() => getGroups());
+  const [groups, setGroups] = useState(() =>
+    getGroupsForCurrentUser().map((x) => x.group)
+  );
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [membersText, setMembersText] = useState("");
+  const [members, setMembers] = useState<GroupMember[]>(() => [emptyMember(), emptyMember()]);
 
   useEffect(() => {
     const user = getUser();
@@ -30,24 +34,62 @@ const Groups = () => {
       navigate("/login");
       return;
     }
-    setGroups(getGroups());
+    setGroups(getGroupsForCurrentUser().map((x) => x.group));
   }, [navigate]);
 
+  const addMember = () => setMembers((prev) => [...prev, emptyMember()]);
+  const removeMember = (i: number) => {
+    if (members.length <= 2) return;
+    setMembers((prev) => prev.filter((_, idx) => idx !== i));
+  };
+  const updateMember = (i: number, field: "name" | "email", value: string) => {
+    setMembers((prev) =>
+      prev.map((m, idx) => (idx === i ? { ...m, [field]: value } : m))
+    );
+  };
+
   const create = () => {
-    const members = membersText.split(",").map((m) => m.trim()).filter(Boolean);
-    if (!name.trim() || members.length < 2) return;
-    const g = addGroup(name.trim(), members);
-    setGroups(getGroups());
-    setOpen(false);
-    setName("");
-    setMembersText("");
-    navigate(`/groups/${g.id}`);
+    const valid = members.filter((m) => m.name.trim());
+    if (!name.trim()) {
+      toast.error("Please enter a group name");
+      return;
+    }
+    if (valid.length < 1) {
+      toast.error("Add at least one member with a name");
+      return;
+    }
+    const user = getUser();
+    const allMembers: GroupMember[] = [];
+    if (user?.name?.trim()) {
+      allMembers.push({ name: user.name, email: user.email });
+    }
+    valid.forEach((m) => {
+      const key = m.email?.trim() || m.name;
+      if (!allMembers.some((x) => (x.email?.trim() || x.name) === key)) {
+        allMembers.push(m);
+      }
+    });
+    if (allMembers.length < 2) {
+      toast.error("Add at least 2 members (enter names in the member fields)");
+      return;
+    }
+    try {
+      const g = addGroup(name.trim(), allMembers);
+      setGroups(getGroupsForCurrentUser().map((x) => x.group));
+      setOpen(false);
+      setName("");
+      setMembers([emptyMember(), emptyMember()]);
+      toast.success("Group created!");
+      navigate(`/groups/${g.id}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create group");
+    }
   };
 
   const handleDeleteGroup = (groupId: string, groupName: string) => {
     try {
       deleteGroup(groupId);
-      setGroups(getGroups());
+      setGroups(getGroupsForCurrentUser().map((x) => x.group));
       toast.success(`Group "${groupName}" deleted successfully!`);
     } catch (error: any) {
       toast.error(error.message || "Failed to delete group");
@@ -69,7 +111,7 @@ const Groups = () => {
           <div className="grid md:grid-cols-2 gap-4">
             {groups.map((g) => {
               const balances = computeGroupBalances(g.id);
-              const summary = summarizeBalances(balances);
+              const summary = summarizeBalances(g, balances);
               return (
                 <div key={g.id} className="relative rounded-xl border border-border bg-card p-5 hover:shadow-md transition">
                   <button
@@ -79,7 +121,9 @@ const Groups = () => {
                     <div className="flex items-center justify-between pr-8">
                       <div>
                         <div className="font-semibold">{g.name}</div>
-                        <div className="text-sm text-muted-foreground">{g.members.join(", ")}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {g.members.map(getMemberDisplay).join(", ")}
+                        </div>
                       </div>
                       <div className="text-sm text-muted-foreground">{summary}</div>
                     </div>
@@ -127,12 +171,57 @@ const Groups = () => {
             <div className="w-full max-w-md rounded-xl bg-card border border-border p-6">
               <h2 className="text-lg font-semibold mb-4">Create Group</h2>
               <label className="block text-sm mb-1">Group name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-input px-3 py-2 mb-3 bg-background" placeholder="Trip to Goa" />
-              <label className="block text-sm mb-1">Members (comma separated)</label>
-              <input value={membersText} onChange={(e) => setMembersText(e.target.value)} className="w-full rounded-md border border-input px-3 py-2 mb-4 bg-background" placeholder="Rahul, Aditi, You" />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-md border border-input px-3 py-2 mb-4 bg-background"
+                placeholder="Trip to Goa"
+              />
+              <label className="block text-sm mb-2">Members</label>
+              <ul className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                {members.map((m, i) => (
+                  <li key={i} className="flex items-center gap-2 list-disc list-inside">
+                    <div className="flex-1 flex gap-2 flex-wrap">
+                      <input
+                        value={m.name}
+                        onChange={(e) => updateMember(i, "name", e.target.value)}
+                        className="flex-1 min-w-[100px] rounded-md border border-input px-3 py-2 bg-background text-sm"
+                        placeholder="Name"
+                      />
+                      <input
+                        value={m.email || ""}
+                        onChange={(e) => updateMember(i, "email", e.target.value)}
+                        className="flex-1 min-w-[100px] rounded-md border border-input px-3 py-2 bg-background text-sm"
+                        placeholder="Email (optional, links if they have account)"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeMember(i)}
+                      disabled={members.length <= 2}
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Remove member"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={addMember}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground mb-4"
+              >
+                <Plus className="h-4 w-4" />
+                Add member
+              </button>
               <div className="flex items-center justify-end gap-2">
-                <button onClick={() => setOpen(false)} className="px-3 py-2 rounded-md border border-border">Cancel</button>
-                <button onClick={create} className="px-3 py-2 rounded-md bg-[hsl(var(--primary))] text-white">Create</button>
+                <button onClick={() => setOpen(false)} className="px-3 py-2 rounded-md border border-border">
+                  Cancel
+                </button>
+                <button type="button" onClick={create} className="px-3 py-2 rounded-md bg-[hsl(var(--primary))] text-white">
+                  Create
+                </button>
               </div>
             </div>
           </div>
@@ -142,14 +231,16 @@ const Groups = () => {
   );
 };
 
-function summarizeBalances(balances: Record<string, number>) {
+function summarizeBalances(group: { members: (string | GroupMember)[] }, balances: Record<string, number>) {
   const entries = Object.entries(balances);
   if (entries.length === 0) return "No balances yet";
   const max = entries.reduce((a, b) => (a[1] > b[1] ? a : b));
   const min = entries.reduce((a, b) => (a[1] < b[1] ? a : b));
   if (Math.abs(max[1]) < 1 && Math.abs(min[1]) < 1) return "All settled";
   const fmt = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
-  return max[1] > 0 ? `${min[0]} owes ${max[0]} ${fmt(min[1])}` : `${max[0]} owes ${min[0]} ${fmt(max[1])}`;
+  const maxDisplay = getMemberDisplayByKey(group, max[0]);
+  const minDisplay = getMemberDisplayByKey(group, min[0]);
+  return max[1] > 0 ? `${minDisplay} owes ${maxDisplay} ${fmt(min[1])}` : `${maxDisplay} owes ${minDisplay} ${fmt(max[1])}`;
 }
 
 export default Groups;
