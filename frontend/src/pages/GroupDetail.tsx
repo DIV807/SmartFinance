@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
 import {
   getUser,
-  getGroups,
+  getGroupsForCurrentUser,
   getGroupExpenses,
   computeGroupBalances,
   deleteSharedExpense,
   computeSettlements,
+  addSettlement,
+  getMemberDisplay,
+  getMemberKey,
+  getMemberDisplayByKey,
 } from "@/lib/storage";
-import { Trash2 } from "lucide-react";
+import { Trash2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -30,10 +35,11 @@ const GroupDetail = () => {
     setReady(true);
   }, [navigate]);
 
-  const group = useMemo(
-    () => getGroups().find((g) => g.id === id),
-    [id]
-  );
+  const group = useMemo(() => {
+    if (!id) return undefined;
+    const items = getGroupsForCurrentUser();
+    return items.find(({ group }) => group.id === id)?.group;
+  }, [id, refreshKey]);
 
   const expenses = useMemo(
     () => getGroupExpenses().filter((e) => e.groupId === id),
@@ -57,6 +63,16 @@ const GroupDetail = () => {
       setRefreshKey((k) => k + 1);
     } catch {
       toast.error("Could not delete expense");
+    }
+  };
+
+  const handleMarkResolved = (from: string, to: string, amount: number) => {
+    try {
+      addSettlement({ groupId: id!, from, to, amount });
+      toast.success("Marked as paid");
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Could not mark as resolved");
     }
   };
 
@@ -89,7 +105,7 @@ const GroupDetail = () => {
           <div>
             <h1 className="text-2xl font-semibold">{group.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {group.members.join(", ")}
+              {group.members.map(getMemberDisplay).join(", ")}
             </p>
           </div>
           <Link
@@ -106,23 +122,25 @@ const GroupDetail = () => {
             <h3 className="text-lg font-semibold mb-3">Balances</h3>
             <div className="space-y-2">
               {group.members.map((m) => {
-                const v = balances[m] || 0;
+                const key = getMemberKey(m);
+                const v = balances[key] ?? 0;
+                const display = getMemberDisplay(m);
                 if (Math.abs(v) < 1) {
                   return (
-                    <div key={m} className="text-sm text-muted-foreground">
-                      {m}: settled
+                    <div key={key} className="text-sm text-muted-foreground">
+                      {display}: settled
                     </div>
                   );
                 }
                 return (
-                  <div key={m} className="text-sm">
+                  <div key={key} className="text-sm">
                     {v > 0 ? (
                       <span className="text-emerald-600">
-                        {m} is owed {fmt(v)}
+                        {display} is owed {fmt(v)}
                       </span>
                     ) : (
                       <span className="text-red-600">
-                        {m} owes {fmt(v)}
+                        {display} owes {fmt(v)}
                       </span>
                     )}
                   </div>
@@ -139,12 +157,23 @@ const GroupDetail = () => {
                 All settled !!
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {settlements.map((s, i) => (
-                  <div key={i} className="text-sm">
-                    <span className="font-medium">{s.from}</span> pays{" "}
-                    <span className="font-medium">{fmt(s.amount)}</span> to{" "}
-                    <span className="font-medium">{s.to}</span>
+                  <div key={i} className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/50 border border-border">
+                    <div className="text-sm">
+                      <span className="font-medium">{getMemberDisplayByKey(group, s.from)}</span> pays{" "}
+                      <span className="font-medium">{fmt(s.amount)}</span> to{" "}
+                      <span className="font-medium">{getMemberDisplayByKey(group, s.to)}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+                      onClick={() => handleMarkResolved(s.from, s.to, s.amount)}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Resolved
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -172,11 +201,11 @@ const GroupDetail = () => {
                           {e.description}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Paid by {e.paidBy} on{" "}
+                          Paid by {getMemberDisplayByKey(group, e.paidBy)} on{" "}
                           {new Date(e.date).toLocaleDateString()}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Split among: {e.participants.join(", ")}
+                          Split among: {e.participants.map((p) => getMemberDisplayByKey(group, p)).join(", ")}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Split type: {e.splitType || "equal"}
@@ -190,7 +219,7 @@ const GroupDetail = () => {
                                   key={person}
                                   className="flex justify-between"
                                 >
-                                  <span>{person}</span>
+                                  <span>{getMemberDisplayByKey(group, person)}</span>
                                   <span>
                                     {person === e.paidBy
                                       ? `share ${fmt(share)} (already paid)`
