@@ -52,11 +52,40 @@ export const logout = () => {
 };
 
 // Groups (frontend-only state)
+export interface GroupMember {
+  name: string;
+  email?: string; // if provided & user has account, links automatically
+}
 export interface Group {
   id: string;
   name: string;
-  members: string[]; // names/emails
+  members: (string | GroupMember)[]; // legacy: string; new: { name, email? }
   createdAt: string;
+}
+
+// Get display name for a member (handles legacy string format)
+export function getMemberDisplay(m: string | GroupMember): string {
+  return typeof m === "string" ? m : m.name;
+}
+// Get display name from member key (for balances display)
+export function getMemberDisplayByKey(group: Group, key: string): string {
+  const m = group.members.find((x) => getMemberKey(x) === key);
+  return m ? getMemberDisplay(m) : key;
+}
+// Get canonical key for balances/shares (email for linked accounts, else name)
+export function getMemberKey(m: string | GroupMember): string {
+  if (typeof m === "string") return m;
+  return m.email?.trim() ? m.email.trim() : m.name;
+}
+// Get member keys for a group (for paidBy, participants, shares)
+export function getMemberKeys(group: Group): string[] {
+  return group.members.map(getMemberKey);
+}
+// Normalize members to GroupMember[]
+export function normalizeMembers(members: (string | GroupMember)[]): GroupMember[] {
+  return members.map((m) =>
+    typeof m === "string" ? { name: m } : { name: m.name, email: m.email }
+  );
 }
 
 export interface SharedExpense {
@@ -87,12 +116,14 @@ export const saveGroups = (groups: Group[]) => {
   localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
 };
 
-export const addGroup = (name: string, members: string[]): Group => {
+export const addGroup = (name: string, members: GroupMember[]): Group => {
   const groups = getGroups();
+  const valid = members.filter((m) => m.name.trim());
+  if (valid.length < 2) throw new Error("At least 2 members required");
   const group: Group = {
     id: Date.now().toString(),
     name,
-    members: members.map((m) => m.trim()).filter(Boolean),
+    members: valid,
     createdAt: new Date().toISOString(),
   };
   groups.unshift(group);
@@ -102,13 +133,11 @@ export const addGroup = (name: string, members: string[]): Group => {
 
 export const deleteGroup = (groupId: string) => {
   const groups = getGroups();
-  const filteredGroups = groups.filter((g) => g.id !== groupId);
-  saveGroups(filteredGroups);
-  
-  // Also delete all expenses associated with this group
+  saveGroups(groups.filter((g) => g.id !== groupId));
   const expenses = getGroupExpenses();
-  const filteredExpenses = expenses.filter((e) => e.groupId !== groupId);
-  saveGroupExpenses(filteredExpenses);
+  saveGroupExpenses(expenses.filter((e) => e.groupId !== groupId));
+  const settlements = getSettlements();
+  saveSettlements(settlements.filter((s) => s.groupId !== groupId));
 };
 
 export const getGroupExpenses = (): SharedExpense[] => {
@@ -132,31 +161,85 @@ export const addSharedExpense = (expense: Omit<SharedExpense, "id" | "createdAt"
   return newItem;
 };
 
-// Compute balances for a group(New)
+// Settlements (when someone pays another - reduces balance)
+export interface Settlement {
+  id: string;
+  groupId: string;
+  from: string; // member key (owes)
+  to: string;   // member key (is owed)
+  amount: number;
+  paidAt: string;
+}
+const SETTLEMENTS_KEY = "smartfinance_settlements";
+
+export function getSettlements(): Settlement[] {
+  const stored = localStorage.getItem(SETTLEMENTS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+function saveSettlements(items: Settlement[]) {
+  localStorage.setItem(SETTLEMENTS_KEY, JSON.stringify(items));
+}
+export function addSettlement(s: Omit<Settlement, "id" | "paidAt">): Settlement {
+  const items = getSettlements();
+  const newItem: Settlement = {
+    ...s,
+    id: Date.now().toString(),
+    paidAt: new Date().toISOString(),
+  };
+  items.push(newItem);
+  saveSettlements(items);
+  return newItem;
+}
+
+// Compute balances for a group (expenses minus settlements)
 export function computeGroupBalances(groupId: string) {
   const group = getGroups().find(g => g.id === groupId);
   if (!group) return {};
 
-  const expenses = getGroupExpenses().filter(e => e.groupId === groupId);
-
+  const memberKeys = group.members.map(getMemberKey);
   const balances: Record<string, number> = {};
-  group.members.forEach(m => balances[m] = 0);
+  memberKeys.forEach(k => balances[k] = 0);
 
+  const expenses = getGroupExpenses().filter(e => e.groupId === groupId);
   expenses.forEach(exp => {
-    // payer paid full amount
-    balances[exp.paidBy] += exp.amount;
-
-    // everyone owes their share (including payer)
+    balances[exp.paidBy] = (balances[exp.paidBy] ?? 0) + exp.amount;
     if (exp.shares) {
       Object.entries(exp.shares).forEach(([person, share]) => {
-        balances[person] -= share;
+        balances[person] = (balances[person] ?? 0) - share;
       });
     }
+  });
+
+  const settlements = getSettlements().filter(s => s.groupId === groupId);
+  settlements.forEach(s => {
+    if (balances[s.from] !== undefined) balances[s.from] += s.amount;
+    if (balances[s.to] !== undefined) balances[s.to] -= s.amount;
   });
 
   return balances;
 }
 
+
+// Get member key for current user (for matching in groups)
+export function getCurrentUserMemberKey(): string | null {
+  const user = getUser();
+  if (!user) return null;
+  return user.email || user.name;
+}
+
+// Get groups where current user is a member (by email or name)
+export function getGroupsForCurrentUser(): { group: Group; myKey: string }[] {
+  const userKey = getCurrentUserMemberKey();
+  if (!userKey) return [];
+  return getGroups()
+    .map((group) => {
+      const myKey = group.members
+        .map(getMemberKey)
+        .find((k) => k.toLowerCase() === userKey.toLowerCase());
+      return myKey ? { group, myKey } : null;
+    })
+    .filter((x): x is { group: Group; myKey: string } => x !== null);
+}
 
 export function computeSettlements(groupId: string) {
   const balances = computeGroupBalances(groupId);
