@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
-import { getUser, getGroups, addSharedExpense } from "@/lib/storage";
+import { getUser, getGroups, addSharedExpense, getMemberKeys, getMemberDisplayByKey } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -9,15 +9,16 @@ const AddSharedExpense = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const group = useMemo(() => getGroups().find((g) => g.id === id), [id]);
+  const memberKeys = useMemo(() => (group ? getMemberKeys(group) : []), [group]);
   const [amount, setAmount] = useState(0);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [paidBy, setPaidBy] = useState<string>(group?.members[0] || "");
-  const [participants, setParticipants] = useState<string[]>(group?.members || []);
+  const [paidBy, setPaidBy] = useState<string>(memberKeys[0] || "");
+  const [participants, setParticipants] = useState<string[]>(memberKeys);
   const [splitType, setSplitType] = useState<"equal" | "percent" | "exact">("equal");
   const [shareInputs, setShareInputs] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
-    (group?.members || []).forEach((m) => (initial[m] = ""));
+    memberKeys.forEach((k) => (initial[k] = ""));
     return initial;
   });
 
@@ -28,6 +29,23 @@ const AddSharedExpense = () => {
       return;
     }
   }, [navigate]);
+
+  useEffect(() => {
+    if (memberKeys.length > 0) {
+      setPaidBy((p) => (memberKeys.includes(p) ? p : memberKeys[0]));
+      setParticipants((prev) =>
+        prev.length && prev.every((k) => memberKeys.includes(k))
+          ? prev
+          : memberKeys
+      );
+      setShareInputs((prev) =>
+        memberKeys.reduce<Record<string, string>>((acc, k) => {
+          acc[k] = prev[k] ?? "";
+          return acc;
+        }, {})
+      );
+    }
+  }, [memberKeys.join(",")]);
 
   // Keep per-participant inputs in sync with selection
   useEffect(() => {
@@ -144,18 +162,18 @@ const AddSharedExpense = () => {
 
           <label className="block text-sm mb-1">Paid by</label>
           <select value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className="w-full rounded-md border border-input px-3 py-2 mb-4 bg-background">
-            {group.members.map((m) => (
-              <option key={m} value={m}>{m}</option>
+            {memberKeys.map((k) => (
+              <option key={k} value={k}>{getMemberDisplayByKey(group, k)}</option>
             ))}
           </select>
 
           <div className="mb-4">
             <div className="block text-sm mb-2">Participants</div>
             <div className="flex flex-wrap gap-2">
-              {group.members.map((m) => (
-                <label key={m} className={`px-3 py-1.5 rounded-full border ${participants.includes(m) ? 'bg-[hsl(var(--primary))] text-white border-transparent' : 'bg-background border-border'}`}>
-                  <input type="checkbox" className="hidden" checked={participants.includes(m)} onChange={() => toggleParticipant(m)} />
-                  {m}
+              {memberKeys.map((k) => (
+                <label key={k} className={`px-3 py-1.5 rounded-full border cursor-pointer ${participants.includes(k) ? 'bg-[hsl(var(--primary))] text-white border-transparent' : 'bg-background border-border'}`}>
+                  <input type="checkbox" className="hidden" checked={participants.includes(k)} onChange={() => toggleParticipant(k)} />
+                  {getMemberDisplayByKey(group, k)}
                 </label>
               ))}
             </div>
@@ -182,7 +200,7 @@ const AddSharedExpense = () => {
               <div className="text-sm text-muted-foreground">Enter percentage for each participant (must total 100%)</div>
               {participants.map((p) => (
                 <div key={p} className="flex items-center gap-3">
-                  <div className="w-32 text-sm">{p}</div>
+                  <div className="w-32 text-sm">{getMemberDisplayByKey(group, p)}</div>
                   <input
                     type="number"
                     min="0"
@@ -202,7 +220,7 @@ const AddSharedExpense = () => {
               <div className="text-sm text-muted-foreground">Enter exact amount per participant (must total the expense)</div>
               {participants.map((p) => (
                 <div key={p} className="flex items-center gap-3">
-                  <div className="w-32 text-sm">{p}</div>
+                  <div className="w-32 text-sm">{getMemberDisplayByKey(group, p)}</div>
                   <input
                     type="number"
                     min="0"
@@ -225,17 +243,18 @@ const AddSharedExpense = () => {
 
           <div className="mb-4 rounded-lg border border-border bg-muted/30 p-4">
             <div className="text-sm font-medium mb-2">Who owes whom (preview)</div>
-            <div className="text-xs text-muted-foreground mb-2">Paid by {paidBy || "—"} · Total {previewTotal ? `₹${previewTotal.toFixed(2)}` : "—"}</div>
+            <div className="text-xs text-muted-foreground mb-2">Paid by {paidBy ? getMemberDisplayByKey(group, paidBy) : "—"} · Total {previewTotal ? `₹${previewTotal.toFixed(2)}` : "—"}</div>
             <div className="space-y-1 text-sm">
               {participants.length === 0 ? (
                 <div className="text-muted-foreground">Select participants to see the split.</div>
               ) : (
                 participants.map((p) => {
                   const share = previewShares[p] ?? 0;
-                  const label = paidBy === p ? "already paid their part" : `owes ₹${share.toFixed(2)} to ${paidBy || "payer"}`;
+                  const payerLabel = paidBy ? getMemberDisplayByKey(group, paidBy) : "payer";
+                  const label = paidBy === p ? "already paid their part" : `owes ₹${share.toFixed(2)} to ${payerLabel}`;
                   return (
                     <div key={p} className="flex items-center justify-between">
-                      <span>{p}</span>
+                      <span>{getMemberDisplayByKey(group, p)}</span>
                       <span className="text-muted-foreground">{label}</span>
                     </div>
                   );
