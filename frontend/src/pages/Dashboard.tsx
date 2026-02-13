@@ -10,10 +10,14 @@ import {
   deleteExpense,
   getBudget,
   saveBudget,
+  getGroupsForCurrentUser,
+  computeSettlements,
+  addSettlement,
+  getMemberDisplayByKey,
 } from "@/lib/storage";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
-import { Pencil, Plus, Minus } from "lucide-react";
+import { Pencil, Plus, Minus, CheckCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,6 +45,7 @@ const Dashboard = () => {
   const [monthlyBudget, setMonthlyBudget] = useState<number>(10000);
   const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
   const [budgetInput, setBudgetInput] = useState<string>("");
+  const [groupRefreshKey, setGroupRefreshKey] = useState(0);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
@@ -307,6 +312,55 @@ const Dashboard = () => {
 
   const aiInsights = generateAIInsights();
 
+  // Group balances: amounts current user owes or is owed
+  const groupContexts = getGroupsForCurrentUser();
+  void groupRefreshKey; // trigger recompute when groups/settlements change
+  const amountDueItems: {
+    groupId: string;
+    groupName: string;
+    type: "owe" | "owed";
+    from: string;
+    to: string;
+    otherDisplay: string;
+    amount: number;
+  }[] = [];
+  groupContexts.forEach(({ group, myKey }) => {
+    const settlements = computeSettlements(group.id);
+    settlements.forEach((s) => {
+      if (s.from === myKey) {
+        amountDueItems.push({
+          groupId: group.id,
+          groupName: group.name,
+          type: "owe",
+          from: s.from,
+          to: s.to,
+          otherDisplay: getMemberDisplayByKey(group, s.to),
+          amount: s.amount,
+        });
+      } else if (s.to === myKey) {
+        amountDueItems.push({
+          groupId: group.id,
+          groupName: group.name,
+          type: "owed",
+          from: s.from,
+          to: s.to,
+          otherDisplay: getMemberDisplayByKey(group, s.from),
+          amount: s.amount,
+        });
+      }
+    });
+  });
+
+  const handleMarkResolved = (groupId: string, fromKey: string, toKey: string, amount: number) => {
+    try {
+      addSettlement({ groupId, from: fromKey, to: toKey, amount });
+      toast.success("Marked as paid");
+      setGroupRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Could not mark as resolved");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background animate-fade-in">
       <Navbar />
@@ -462,6 +516,59 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Amount Due (Split with Friends) */}
+        {amountDueItems.length > 0 && (
+          <div className="bg-card rounded-2xl p-6 shadow-md border border-border mb-8 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '220ms' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-primary" />
+              <h3 className="text-xl font-semibold text-foreground">Amount Due</h3>
+              <button
+                onClick={() => navigate("/groups")}
+                className="text-sm text-primary hover:underline font-medium ml-auto"
+              >
+                View Groups
+              </button>
+            </div>
+            <div className="space-y-3">
+              {amountDueItems.map((item, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    item.type === "owe"
+                      ? "border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20"
+                      : "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">
+                      {item.type === "owe" ? (
+                        <>You owe <span className="text-amber-700 dark:text-amber-400">{item.otherDisplay}</span></>
+                      ) : (
+                        <><span className="text-emerald-700 dark:text-emerald-400">{item.otherDisplay}</span> owes you</>
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({item.groupName})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold ${item.type === "owe" ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                      {formatCurrency(item.amount)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+                      onClick={() => handleMarkResolved(item.groupId, item.from, item.to, item.amount)}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Resolved
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Monthly Expenses Section */}
         <div className="bg-card rounded-2xl p-6 shadow-md border border-border mb-8 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg animate-fade-up" style={{ ['--delay' as any]: '250ms' }}>
