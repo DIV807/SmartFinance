@@ -14,6 +14,8 @@ const ScanReceipt = () => {
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
+  const [rawText, setRawText] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const user = getUser();
@@ -32,18 +34,64 @@ const ScanReceipt = () => {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const mockOcr = async () => {
+  const runOcr = async () => {
     if (!file) return;
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 700));
-    // Very simple mock: infer amount-like number in filename, fallback to a friendly default
-    const match = file.name.match(/(\d+[\._]?\d{0,2})/);
-    const inferredAmount = match ? Number(match[1].replace(/_/g, ".")) : Math.round(200 + Math.random() * 1200);
-    const inferredCategory = inferCategoryFromName(file.name);
-    setAmount(inferredAmount);
-    setCategory(inferredCategory);
-    if (!description) setDescription(file.name.replace(/\.[^.]+$/, ""));
-    setLoading(false);
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const backendBase = (import.meta as any).env.VITE_API_URL || "http://localhost:5000";
+      const normalizedBase = backendBase.replace(/\/+$/, "");
+      const url = `${normalizedBase}/api/receipt/scan`;
+
+      const formData = new FormData();
+      formData.append("receipt", file);
+
+      const token = localStorage.getItem("smartfinance_token");
+
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Receipt scan failed");
+      }
+
+      const draft = data.draftExpense || {};
+
+      if (draft.amount != null) {
+        setAmount(Number(draft.amount));
+      }
+      if (draft.category) {
+        setCategory(draft.category as typeof categories[number]);
+      }
+      if (draft.description) {
+        setDescription(draft.description);
+      } else if (!description) {
+        setDescription(file.name.replace(/\.[^.]+$/, ""));
+      }
+      if (draft.date) {
+        setDate(draft.date.slice(0, 10));
+      }
+
+      if (typeof data.rawText === "string") {
+        setRawText(data.rawText);
+      } else if (typeof data.text === "string") {
+        setRawText(data.text);
+      }
+    } catch (err: any) {
+      console.error("Receipt scan failed", err);
+      const message = err?.message || "Failed to scan receipt";
+      setError(message);
+      alert(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const save = () => {
@@ -61,7 +109,7 @@ const ScanReceipt = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold mb-6">Scan Receipt (Mocked)</h1>
+        <h1 className="text-2xl font-semibold mb-6">Scan Receipt</h1>
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="rounded-2xl p-6 shadow-md border border-border bg-card">
@@ -88,12 +136,18 @@ const ScanReceipt = () => {
               <h2 className="text-lg font-semibold">Recognized Details</h2>
               <button
                 disabled={!file || loading}
-                onClick={mockOcr}
+                onClick={runOcr}
                 className="px-3 py-2 rounded-md border border-border hover:bg-muted disabled:opacity-50"
               >
                 {loading ? "Analyzing..." : "Auto-fill from Image"}
               </button>
             </div>
+
+            {error && (
+              <p className="text-sm text-red-500 mb-3">
+                {error}
+              </p>
+            )}
 
             <label className="block text-sm mb-1">Amount</label>
             <input
@@ -131,7 +185,16 @@ const ScanReceipt = () => {
               className="w-full rounded-md border border-input px-3 py-2 mb-4 bg-background"
             />
 
-            <div className="flex items-center justify-end gap-2">
+            {rawText && (
+              <div className="mt-4">
+                <div className="text-xs text-muted-foreground mb-1">Raw OCR text</div>
+                <div className="max-h-32 overflow-auto rounded-md border border-border bg-muted p-2 text-xs whitespace-pre-wrap">
+                  {rawText}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 mt-4">
               <button onClick={() => navigate(-1)} className="px-3 py-2 rounded-md border border-border">Cancel</button>
               <button onClick={save} className="px-3 py-2 rounded-md bg-[hsl(var(--primary))] text-white">Confirm & Save</button>
             </div>
