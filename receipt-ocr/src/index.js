@@ -1,37 +1,20 @@
-const express = require("express");
-const multer = require("multer");
-const Tesseract = require("tesseract.js");
-const fs = require("fs");
+const app = require("./app");
+const { logger } = require("./utils/logger");
 
-const app = express();
-const upload = multer({ dest: "uploads/" });
+const PORT = Number(process.env.PORT || 5001);
 
-app.post("/scan", upload.single("receipt"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file received" });
-    }
-
-    const imagePath = req.file.path;
-    console.log("OCR image path:", imagePath);
-
-    const result = await Tesseract.recognize(imagePath, "eng");
-
-    fs.unlinkSync(imagePath);
-
-    res.json({
-      success: true,
-      text: result.data.text,
-    });
-  } catch (err) {
-    console.error("OCR ERROR:", err);
-    res.status(500).json({ error: "OCR failed" }); // 👈 important
-  }
+const server = app.listen(PORT, () => {
+  logger.info(`OCR service listening on port ${PORT}`);
 });
 
-
-app.get("/health", (_, res) => res.send("OK"));
-
-app.listen(5001, () => {
-  console.log("OCR service running on port 5001");
+process.on("unhandledRejection", (reason) => {
+  logger.error("Unhandled promise rejection", reason);
 });
+
+process.on("uncaughtException", (err) => {
+  logger.error("Uncaught exception", err);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
