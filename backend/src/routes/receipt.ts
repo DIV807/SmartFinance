@@ -16,28 +16,14 @@ router.post(
     }
 
     const buffer = fs.readFileSync(req.file.path);
-
-    // Use native fetch + FormData only if available; otherwise send the image path to the OCR microservice
-    const form = new FormData();
-    const blob = new Blob([buffer], { type: req.file.mimetype });
-    form.append("receipt", blob, req.file.originalname);
-
-    const ocrRes = await fetch("http://localhost:5001/scan", {
-      method: "POST",
-      body: form as any,
-    });
-
-    const data = await ocrRes.json();
+    const base64Image = buffer.toString("base64");
+    const mimeType = req.file.mimetype;
 
     fs.unlinkSync(req.file.path);
 
-    if (!data.success) {
-      return res.status(500).json({ error: "OCR failed" });
-    }
-
     let parsed;
     try {
-      parsed = await aiParseReceipt(data.text);
+      parsed = await aiParseReceipt(base64Image, mimeType);
     } catch (err) {
       console.error("AI PARSE FAILED:", err);
       parsed = {
@@ -50,7 +36,7 @@ router.post(
 
     res.json({
       success: true,
-      rawText: data.text,
+      rawText: "Gemini Vision Pipeline Complete.",
       draftExpense: parsed,
     });
 
