@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocr
+  namespace: smartfinance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocr
+  template:
+    metadata:
+      labels:
+        app: ocr
+    spec:
+      containers:
+        - name: ocr
+          image: ocr:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5001
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "5001"
+            - name: OLLAMA_URL
+              value: "http://host.docker.internal:11434"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/app/credentials.json"
+
